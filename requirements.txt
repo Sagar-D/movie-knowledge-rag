@@ -1,3 +1,7 @@
 kagglehub
 pandas
 boto3
+langchain
+langchain_aws
+langchain-huggingface
+sentence-transformers
