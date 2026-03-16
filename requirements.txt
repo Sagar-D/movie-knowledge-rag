@@ -6,3 +6,4 @@ langchain_aws
 langchain-huggingface
 sentence-transformers
 qdrant-client
+langchain-qdrant
