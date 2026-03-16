@@ -5,37 +5,59 @@ from cinerag import config
 import hashlib
 from uuid import UUID
 
-client = AsyncQdrantClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
+
+from qdrant_client import AsyncQdrantClient
+from qdrant_client.models import PointStruct, Distance
+from typing import List, Dict
+from cinerag import config
+import hashlib
+from uuid import UUID
 
 
 class VectorStore:
 
     def __init__(self):
-        self.client = client
+        self.client = AsyncQdrantClient(
+            host=config.QDRANT_HOST, port=config.QDRANT_PORT
+        )
 
-        if not self.client.collection_exists(
+    async def initialize(self):
+
+        exists = await self.client.collection_exists(
             collection_name=config.VECTOR_COLLECTION_NAME
-        ):
-            self.client.create_collection(
+        )
+
+        if not exists:
+
+            await self.client.create_collection(
                 collection_name=config.VECTOR_COLLECTION_NAME,
-                vectors_config={"size": 768, "distance": Distance.COSINE},
+                vectors_config={
+                    "size": 768,
+                    "distance": Distance.COSINE,
+                },
             )
 
     async def store_embeddings(self, docs: List[Dict], embeddings: List):
 
-        points = []
-        for doc, embedding in zip(docs, embeddings):
-            points.append(
-                PointStruct(
-                    id=movie_id(doc["title"], doc["year"], doc["director"]),
-                    vector=embedding,
-                    payload=doc,
-                )
+        points = [
+            PointStruct(
+                id=_movie_id(
+                    doc["metadata"]["title"],
+                    doc["metadata"]["year"],
+                    doc["metadata"]["director"],
+                ),
+                vector=embedding,
+                payload=doc,
             )
-        await client.upsert(collection_name=config.VECTOR_COLLECTION_NAME, points=points)
+            for doc, embedding in zip(docs, embeddings)
+        ]
+
+        await self.client.upsert(
+            collection_name=config.VECTOR_COLLECTION_NAME, points=points
+        )
 
 
-def movie_id(title: str, year: int, director: list[str] | str) -> str:
+def _movie_id(title: str, year: int, director: list[str] | str) -> str:
 
     if type(director) == list:
         director = ",".join(director)

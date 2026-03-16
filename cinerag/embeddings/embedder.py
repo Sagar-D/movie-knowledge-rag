@@ -2,7 +2,7 @@ from langchain_huggingface.embeddings.huggingface import HuggingFaceEmbeddings
 from typing import List
 from cinerag import config
 
-embedder = HuggingFaceEmbeddings()
+embedding_fn = HuggingFaceEmbeddings()
 
 
 async def generate_embeddings(documents: List[str]) -> List:
@@ -11,5 +11,5 @@ async def generate_embeddings(documents: List[str]) -> List:
             f"Number of documents exceeds the batch size limit of {config.EMBEDDING_BATCH_SIZE}"
         )
 
-    embeddings = await embedder.aembed_documents(texts=documents)
+    embeddings = await embedding_fn.aembed_documents(texts=documents)
     return embeddings
