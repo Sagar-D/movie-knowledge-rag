@@ -72,6 +72,11 @@ class RAGAgent:
 
         if str(state.get("query", "")).strip() == "":
             raise ValueError("Required field 'query' missing in the state")
+        
+        state["messages"] = state.get("messages", [])
+        state["context"] = state.get("context", "")
+        state["retrieved_docs"] = state.get("retrieved_docs", [])
+        state["has_context"] = state.get("has_context", False)
 
         agent_state = RAGAgentState(**state)
         agent_state.messages.append(HumanMessage(content=agent_state.query))
