@@ -4,7 +4,7 @@ from cinerag import config
 from pathlib import Path
 from typing import Literal
 
-s3_client = boto3.client("s3")
+_s3_client = boto3.client("s3")
 
 
 def upload_processed_jsonl(
@@ -15,7 +15,7 @@ def upload_processed_jsonl(
 
     jsonl_data = "\n".join(json.dumps(record) for record in data)
     try:
-        s3_client.put_object(
+        _s3_client.put_object(
             Bucket=bucket,
             Key=f"{config.S3_PROCESSED_DATA_FOLDER}{s3_file_name}",
             Body=jsonl_data,
@@ -32,7 +32,7 @@ def upload_raw_file(
 ) -> None:
 
     try:
-        s3_client.upload_file(
+        _s3_client.upload_file(
             Filename=file_path,
             Bucket=bucket,
             Key=f"{config.S3_RAW_DATA_FOLDER}{s3_file_name}",
@@ -58,9 +58,9 @@ def file_exists(
     )
     key = key + s3_file_name
     try:
-        s3_client.head_object(Bucket=bucket, Key=key)
+        _s3_client.head_object(Bucket=bucket, Key=key)
         return True
-    except s3_client.exceptions.ClientError:
+    except _s3_client.exceptions.ClientError:
         return False
 
 
@@ -69,7 +69,7 @@ def get_processed_data_stream(
     bucket: str = config.DEFAULT_S3_BUCKET,
 ):
     try:
-        response = s3_client.get_object(
+        response = _s3_client.get_object(
             Bucket=bucket, Key=f"{config.S3_PROCESSED_DATA_FOLDER}{s3_file_name}"
         )
         return response

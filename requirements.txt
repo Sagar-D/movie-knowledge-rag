@@ -7,3 +7,6 @@ langchain-huggingface
 sentence-transformers
 qdrant-client
 langchain-qdrant
+langchain-community
+rank_bm25
+sentence_transformers
