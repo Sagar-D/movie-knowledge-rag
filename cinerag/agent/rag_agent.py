@@ -11,8 +11,9 @@ from cinerag.llm.prompt_templates import RAG_CHAT_TEMPLATE
 class RAGAgentState(BaseModel):
     query: str
     retrieved_docs: List[Document]
-    messages: Annotated[List[BaseMessage], add_messages]
+    messages: Annotated[List[BaseMessage], add_messages] = Field(default_factory=list)
     context: str
+    has_context: bool
 
 
 class RAGAgent:
@@ -20,33 +21,50 @@ class RAGAgent:
     def __init__(self):
         self.retriever = HybridRetriever()
         self.build_graph()
+        self.chat_model = get_chat_model()
 
     def fetch_context(self, state: RAGAgentState) -> RAGAgentState:
         docs = self.retriever.retrieve_docs(state.query)
-        if len(docs) == 0:
-            context = "No relevant information found."
-        context = "\n\n".join([doc.page_content for doc in docs])
-        return {"context": context, "retrieved_docs": docs}
+        has_context = len(docs) > 0
+        context = "\n\n".join([doc.page_content for doc in docs]) if has_context else ""
+        return {"context": context, "retrieved_docs": docs, "has_context": has_context}
+    
+    def should_initiate_llm(self, state: RAGAgentState) -> bool :
+        if state.has_context:
+            return True
+        return False
+    
+    def no_context_handler(self, state: RAGAgentState) -> RAGAgentState :
+        response = "Sorry, I couldn't find any relevant information to answer your query."
+        return {"messages": [AIMessage(content=response)]}
 
     def rag_chat(self, state: RAGAgentState) -> RAGAgentState:
-        model = get_chat_model()
 
-        llm_chain = RAG_CHAT_TEMPLATE | model
+        llm_chain = RAG_CHAT_TEMPLATE | self.chat_model
         response = llm_chain.invoke(
-            {"input": state.query, "context": state.context, "messages": state.messages}
+            {"input": state.query, "context": state.context, "messages": state.messages[:-1]}
         )
 
-        return {"messages": [HumanMessage(content=state.query), response]}
+        return {"messages": [response]}
 
     def build_graph(self):
 
         graph = StateGraph(RAGAgentState)
         graph.add_node("fetch_context", self.fetch_context)
         graph.add_node("rag_chat", self.rag_chat)
+        graph.add_node("no_context_handler", self.no_context_handler)
         
         graph.add_edge(START, "fetch_context")
-        graph.add_edge("fetch_context", "rag_chat")
-        graph.add_edge("llm_infrag_chaterence", END)
+        graph.add_conditional_edges(
+            "fetch_context",
+            self.should_initiate_llm,
+            {
+                True: "rag_chat",
+                False: "no_context_handler"
+            }
+        )
+        graph.add_edge("rag_chat", END)
+        graph.add_edge("no_context_handler", END)
 
         self.agent = graph.compile()
 
@@ -56,4 +74,5 @@ class RAGAgent:
             raise ValueError("Required field 'query' missing in the state")
 
         agent_state = RAGAgentState(**state)
+        agent_state.messages.append(HumanMessage(content=agent_state.query))
         return self.agent.invoke(agent_state)

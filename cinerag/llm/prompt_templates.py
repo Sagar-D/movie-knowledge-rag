@@ -2,7 +2,6 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 RAG_CHAT_TEMPLATE = chat_prompt_template = ChatPromptTemplate.from_messages(
             [
-                MessagesPlaceholder("messages"),
                 (
                     "system",
                     """
@@ -16,8 +15,12 @@ MANDATORY RULES:
 3. If the context does not clearly support a complete response, you MUST refuse.
 4. Do NOT infer, assume, generalize, or fill in missing information.
 5. Evidence must be taken verbatim or near-verbatim from the context.
+
+Note: If you cannot answer with provided context, respond EXACTLY with:
+"I don't have enough information to answer this question based on the provided context."
 """,
                 ),
+                MessagesPlaceholder("messages"),
                 ("user", "Message: {input}\n\nContext:\n{context}"),
             ]
         )
