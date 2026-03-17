@@ -2,8 +2,7 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import PointStruct, Distance
 from typing import List, Dict
 from cinerag import config
-import hashlib
-from uuid import UUID
+from cinerag.documents.helper import generate_movie_doc_id
 
 
 from qdrant_client import AsyncQdrantClient
@@ -11,7 +10,6 @@ from qdrant_client.models import PointStruct, Distance
 from typing import List, Dict
 from cinerag import config
 import hashlib
-from uuid import UUID
 
 
 class VectorStore:
@@ -32,7 +30,7 @@ class VectorStore:
             await self.client.create_collection(
                 collection_name=config.VECTOR_COLLECTION_NAME,
                 vectors_config={
-                    "size": 768,
+                    "size": config.EMBEDDING_DIMENSION,
                     "distance": Distance.COSINE,
                 },
             )
@@ -41,7 +39,7 @@ class VectorStore:
 
         points = [
             PointStruct(
-                id=_movie_id(
+                id=generate_movie_doc_id(
                     doc["metadata"]["title"],
                     doc["metadata"]["year"],
                     doc["metadata"]["director"],
@@ -55,12 +53,3 @@ class VectorStore:
         await self.client.upsert(
             collection_name=config.VECTOR_COLLECTION_NAME, points=points
         )
-
-
-def _movie_id(title: str, year: int, director: list[str] | str) -> str:
-
-    if type(director) == list:
-        director = ",".join(director)
-    key = f"{title}_{year}_{director}"
-    hash_bytes = hashlib.sha256(key.encode()).digest()
-    return str(UUID(bytes=hash_bytes[:16]))

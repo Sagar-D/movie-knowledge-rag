@@ -2,7 +2,7 @@ from langchain_qdrant import QdrantVectorStore
 from cinerag.embeddings import embedder
 from cinerag import config
 
-class Retriever:
+class QdrantRetriever:
 
     def __init__(self):
         
@@ -15,8 +15,8 @@ class Retriever:
         )
         pass
 
-    def retrieve_docs(self, query: str) :
-        return self.vector_store.similarity_search(query, k=5)
+    def retrieve_docs(self, query: str, k:int = 5) :
+        return self.vector_store.similarity_search(query, k=k)
 
 
 
