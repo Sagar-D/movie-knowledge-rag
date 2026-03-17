@@ -2,10 +2,10 @@ from langgraph.graph import StateGraph, START, END, add_messages
 from pydantic import BaseModel, Field
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from typing import List, Dict, Annotated
 from cinerag.retrieval.hybrid_retriever import HybridRetriever
 from cinerag.llm.model_handler import get_chat_model
+from cinerag.llm.prompt_templates import RAG_CHAT_TEMPLATE
 
 
 class RAGAgentState(BaseModel):
@@ -28,31 +28,10 @@ class RAGAgent:
         context = "\n\n".join([doc.page_content for doc in docs])
         return {"context": context, "retrieved_docs": docs}
 
-    def llm_inference(self, state: RAGAgentState) -> RAGAgentState:
+    def rag_chat(self, state: RAGAgentState) -> RAGAgentState:
         model = get_chat_model()
 
-        chat_prompt_template = ChatPromptTemplate.from_messages(
-            [
-                MessagesPlaceholder("messages"),
-                (
-                    "system",
-                    """
-You are a strictly context-grounded assistant.
-
-Your task is to respond to the user's message ONLY if it can be fully supported by the provided context.
-
-MANDATORY RULES:
-1. You MUST NOT use any internal, external, or prior knowledge.
-2. Every part of your response MUST be directly supported by the provided context.
-3. If the context does not clearly support a complete response, you MUST refuse.
-4. Do NOT infer, assume, generalize, or fill in missing information.
-5. Evidence must be taken verbatim or near-verbatim from the context.
-""",
-                ),
-                ("user", "Message: {input}\n\nContext:\n{context}"),
-            ]
-        )
-        llm_chain = chat_prompt_template | model
+        llm_chain = RAG_CHAT_TEMPLATE | model
         response = llm_chain.invoke(
             {"input": state.query, "context": state.context, "messages": state.messages}
         )
@@ -62,11 +41,12 @@ MANDATORY RULES:
     def build_graph(self):
 
         graph = StateGraph(RAGAgentState)
-        graph.add_node("rag_context", self.fetch_context)
-        graph.add_node("llm_inference", self.llm_inference)
-        graph.add_edge(START, "rag_context")
-        graph.add_edge("rag_context", "llm_inference")
-        graph.add_edge("llm_inference", END)
+        graph.add_node("fetch_context", self.fetch_context)
+        graph.add_node("rag_chat", self.rag_chat)
+        
+        graph.add_edge(START, "fetch_context")
+        graph.add_edge("fetch_context", "rag_chat")
+        graph.add_edge("llm_infrag_chaterence", END)
 
         self.agent = graph.compile()
 
