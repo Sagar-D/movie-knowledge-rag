@@ -2,6 +2,7 @@ kagglehub
 pandas
 boto3
 langchain
+langgraph
 langchain_aws
 langchain-huggingface
 sentence-transformers
@@ -10,3 +11,4 @@ langchain-qdrant
 langchain-community
 rank_bm25
 sentence_transformers
+dotenv

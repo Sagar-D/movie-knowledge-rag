@@ -9,17 +9,17 @@ reranker = CrossEncoder(config.RERANKER_MODEL)
 class HybridRetriever:
 
     def __init__(
-        self, bm25_retriever: BM25Retriever, vector_retriever: QdrantRetriever
+        self, bm25_retriever: BM25Retriever = None, vector_retriever: QdrantRetriever = None
     ):
-        self.bm25 = bm25_retriever
-        self.vector = vector_retriever
+        self.bm25 = bm25_retriever if bm25_retriever else BM25Retriever()
+        self.vector = vector_retriever if vector_retriever else QdrantRetriever()
 
     def retrieve_docs(self, query: str, k: int = 5):
 
         candidate_docs = self.vector.retrieve_docs(query, max(20, 3 * k))
-        unique_doc_ids = {
+        unique_doc_ids = set(
             [doc.metadata.get("id", doc.page_content) for doc in candidate_docs]
-        }
+        )
 
         for doc in self.bm25.retrieve_docs(query, max(20, 2 * k)):
             doc_id = doc.metadata.get("id", doc.page_content)
