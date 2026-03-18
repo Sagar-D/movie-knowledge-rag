@@ -34,7 +34,7 @@ async def stream_document_embeddings():
 async def build_rag_index():
 
     vector_store = VectorStore()
-    vector_store.initialize()
+    await vector_store.initialize()
     async for docs, embeddings in stream_document_embeddings():
         docs = [{"page_content": record["text"], "metadata":record["metadata"]} for record in docs]
         await vector_store.store_embeddings(docs=docs, embeddings=embeddings)

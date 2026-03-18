@@ -6,6 +6,37 @@ import json
 import logging
 
 
+is_bm25_index_built = False
+bm25_documents = []
+
+
+def build_bm25_idnde():
+    global is_bm25_index_built
+    global bm25_documents
+
+    if is_bm25_index_built:
+        return
+
+    logging.info("Loading documents for BM25 Indexing")
+    s3_data_obj = s3_client.get_processed_data_stream()
+    for line in s3_data_obj["Body"].iter_lines():
+        record = json.loads(line.decode("utf-8"))
+        bm25_documents.append(
+            Document(
+                page_content=record["text"],
+                metadata={
+                    "id": generate_movie_doc_id(
+                        record["metadata"]["title"],
+                        record["metadata"]["year"],
+                        record["metadata"]["director"],
+                    ),
+                    "metadata": record["metadata"],
+                },
+            )
+        )
+    logging.info("Loaded %s documents for BM25 Indexing", len(bm25_documents))
+
+
 class BM25Retriever:
 
     _instance = None
@@ -18,33 +49,9 @@ class BM25Retriever:
 
     def __init__(self):
 
-        self.documents = self._load_documents()
-        self.retriever = LC_BM25Retriever.from_documents(self.documents)
-        logging.info("Created BM25 Index for %s documents", len(self.documents))
-
-    def _load_documents(self):
-
-        logging.info("Loading documents for BM25 Indexing")
-        s3_data_obj = s3_client.get_processed_data_stream()
-        documents = []
-
-        for line in s3_data_obj["Body"].iter_lines():
-            record = json.loads(line.decode("utf-8"))
-            documents.append(
-                Document(
-                    page_content=record["text"],
-                    metadata={
-                        "id": generate_movie_doc_id(
-                            record["metadata"]["title"],
-                            record["metadata"]["year"],
-                            record["metadata"]["director"],
-                        ),
-                        "metadata": record["metadata"],
-                    },
-                )
-            )
-        logging.info("Loaded %s documents for BM25 Indexing", len(documents))
-        return documents
+        global bm25_documents
+        self.retriever = LC_BM25Retriever.from_documents(bm25_documents)
+        logging.info("Created BM25 Index for %s documents", len(bm25_documents))
 
     def retrieve_docs(self, query: str, k: int = 5):
 

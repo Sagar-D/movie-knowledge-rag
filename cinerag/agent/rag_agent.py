@@ -12,9 +12,9 @@ from cinerag.agent.rag_agent_prompts import (
     RAG_QUERY_ENRICHMENT_PROMPT,
 )
 from cinerag import config
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, Field
-import json
+
 
 
 class RAGAgentState(BaseModel):
@@ -38,7 +38,7 @@ class RetrievalToolInput(BaseModel):
         None,
         description="If the query is related to a specific movie, extract the movie release year and provide it here. Otherwise, leave it empty.",
     )
-    genre: Optional[str] = Field(
+    genre: Optional[Literal["drama", "comedy", "horror", "action"]] = Field(
         None,
         description="If user has requested for a specific genre, pass the value here. If not leave it empty.",
     )
@@ -62,7 +62,7 @@ It uses a hybrid retrieval approach combining BM25 and vector-based retrieval to
     }
     filters = {k: v for k, v in filters.items() if v is not None}
     docs = retriever.retrieve_docs(
-        enriched_query, filters=filters, k=config.RETRIEVAL_K
+        enriched_query, metadata_filters=filters, k=config.RETRIEVAL_K
     )
     has_context = len(docs) > 0
     context = "\n\n".join([doc.page_content for doc in docs]) if has_context else ""
@@ -81,7 +81,7 @@ class RAGAgent:
         self.chat_model = get_chat_model()
 
     def enrich_rag_filter(self, state: RAGAgentState) -> RAGAgentState:
-        print("Enriching Query")
+
         enrichment_chain = RAG_QUERY_ENRICHMENT_PROMPT | self.chat_model.bind_tools(
             [retrieval_tool]
         )
@@ -98,7 +98,6 @@ class RAGAgent:
                 tool_message = ToolMessage(
                     content=rag_tool_response["context"], tool_call_id=tool_call["id"]
                 )
-                print("Context : \n", rag_tool_response["context"])
                 return {"messages": [tool_message], **rag_tool_response}
 
     def should_initiate_llm(self, state: RAGAgentState) -> bool:

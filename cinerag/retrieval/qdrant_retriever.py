@@ -1,4 +1,5 @@
 from langchain_qdrant import QdrantVectorStore
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 from cinerag.embeddings import embedder
 from cinerag import config
@@ -26,10 +27,11 @@ class QdrantRetriever:
             )
         return self.vector_store.similarity_search(query, k=k)
 
-    def _generate_metadata_filter(self, filters: Dict):
-
-        updated_filters = {}
-        for key, value in filters.items():
-            if value is not None:
-                updated_filters[key] = value
-        return updated_filters
+    def _generate_metadata_filter(self, filters: Dict) -> Filter:
+        return Filter(
+            must=[
+                FieldCondition(key=f"metadata.{key}", match=MatchValue(value=value))
+                for key, value in filters.items()
+                if value is not None
+            ]
+        )
