@@ -2,6 +2,7 @@ from cinerag.retrieval.bm25_retriever import BM25Retriever
 from cinerag.retrieval.qdrant_retriever import QdrantRetriever
 from sentence_transformers import CrossEncoder
 from cinerag import config
+from typing import Dict
 
 reranker = CrossEncoder(config.RERANKER_MODEL)
 
@@ -9,14 +10,20 @@ reranker = CrossEncoder(config.RERANKER_MODEL)
 class HybridRetriever:
 
     def __init__(
-        self, bm25_retriever: BM25Retriever = None, vector_retriever: QdrantRetriever = None
+        self,
+        bm25_retriever: BM25Retriever = None,
+        vector_retriever: QdrantRetriever = None,
     ):
         self.bm25 = bm25_retriever if bm25_retriever else BM25Retriever()
         self.vector = vector_retriever if vector_retriever else QdrantRetriever()
 
-    def retrieve_docs(self, query: str, k: int = 5):
+    def retrieve_docs(
+        self, query: str, metadat_filters: Dict | None = None, k: int = 5
+    ):
 
-        candidate_docs = self.vector.retrieve_docs(query, max(20, 3 * k))
+        candidate_docs = self.vector.retrieve_docs(
+            query, metadat_filters, max(20, 3 * k)
+        )
         unique_doc_ids = set(
             [doc.metadata.get("id", doc.page_content) for doc in candidate_docs]
         )

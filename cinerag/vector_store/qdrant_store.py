@@ -9,7 +9,7 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import PointStruct, Distance
 from typing import List, Dict
 from cinerag import config
-import hashlib
+
 
 
 class VectorStore:
