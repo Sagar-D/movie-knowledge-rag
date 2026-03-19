@@ -13,3 +13,5 @@ langchain-community
 rank_bm25
 sentence_transformers
 dotenv
+fastapi
+uvicorn[standard]
