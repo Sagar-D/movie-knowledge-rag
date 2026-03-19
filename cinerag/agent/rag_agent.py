@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, START, END, add_messages
 from pydantic import BaseModel, Field
 from langchain_core.documents import Document
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from typing import List, Dict, Annotated, Optional
 from cinerag.retrieval.hybrid_retriever import HybridRetriever
 from cinerag.retrieval.qdrant_retriever import QdrantRetriever
@@ -57,10 +57,13 @@ class RetrievalConfig(BaseModel):
 class RAGAgent:
 
     def __init__(self):
-        self.retriever = QdrantRetriever()
         self.build_graph()
         self.chat_model = get_chat_model()
         self.query_enrichment_model = get_query_enrichment_model()
+        if config.RAG_RETRIEVAL_TYPE == "vector":
+            self.retriever = QdrantRetriever()
+        else:
+            self.retriever = HybridRetriever()
 
     def enrich_rag_filter(self, state: RAGAgentState) -> RAGAgentState:
 
