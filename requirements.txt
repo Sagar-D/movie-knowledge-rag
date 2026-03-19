@@ -4,6 +4,7 @@ boto3
 langchain
 langgraph
 langchain_aws
+langchain-google-genai
 langchain-huggingface
 sentence-transformers
 qdrant-client

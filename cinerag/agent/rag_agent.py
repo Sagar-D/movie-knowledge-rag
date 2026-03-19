@@ -2,11 +2,10 @@ from langgraph.graph import StateGraph, START, END, add_messages
 from pydantic import BaseModel, Field
 from langchain_core.documents import Document
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
-from langchain.tools import tool
 from typing import List, Dict, Annotated, Optional
 from cinerag.retrieval.hybrid_retriever import HybridRetriever
 from cinerag.retrieval.qdrant_retriever import QdrantRetriever
-from cinerag.llm.model_handler import get_chat_model
+from cinerag.llm.model_handler import get_chat_model, get_query_enrichment_model
 from cinerag.agent.rag_agent_prompts import (
     RAG_CHAT_TEMPLATE,
     RAG_QUERY_ENRICHMENT_PROMPT,
@@ -14,7 +13,7 @@ from cinerag.agent.rag_agent_prompts import (
 from cinerag import config
 from typing import Optional, Literal
 from pydantic import BaseModel, Field
-
+import logging
 
 
 class RAGAgentState(BaseModel):
@@ -23,13 +22,11 @@ class RAGAgentState(BaseModel):
     messages: Annotated[List[BaseMessage], add_messages] = Field(default_factory=list)
     context: str
     has_context: bool
+    enriched_query: str
+    rag_filters: Dict
 
 
-class RetrievalToolInput(BaseModel):
-    enriched_query: str = Field(
-        ...,
-        description="The original user query enriched with any additional information extracted from the query, such as movie titles, years, directors, etc. This is the query that will be used for retrieval.",
-    )
+class RetrievalMetadataFilters(BaseModel):
     title: Optional[str] = Field(
         None,
         description="If the query is related to a specific movie, extract the movie title and provide it here. Otherwise, leave it empty.",
@@ -44,61 +41,60 @@ class RetrievalToolInput(BaseModel):
     )
 
 
-@tool("context_retrieval_tool", args_schema=RetrievalToolInput)
-def retrieval_tool(
-    enriched_query: str,
-    title: Optional[str] = None,
-    year: Optional[int] = None,
-    genre: Optional[str] = None,
-) -> dict:
-    """This tool is responsible for retrieving relevant context documents based on the enriched user query and any extracted metadata filters. \
-It uses a hybrid retrieval approach combining BM25 and vector-based retrieval to fetch the most relevant documents from the knowledge base."""
+class RetrievalConfig(BaseModel):
+    """JSON fomrated filters and enriched query for retrieving context based on enriched query and filters"""
 
-    retriever = QdrantRetriever()
-    filters = {
-        "title": title,
-        "year": year,
-        "genre": genre,
-    }
-    filters = {k: v for k, v in filters.items() if v is not None}
-    docs = retriever.retrieve_docs(
-        enriched_query, metadata_filters=filters, k=config.RETRIEVAL_K
+    enriched_query: str = Field(
+        ...,
+        description="The original user query enriched with any additional information extracted from the query, such as movie titles, years, directors, etc. This is the query that will be used for retrieval.",
     )
-    has_context = len(docs) > 0
-    context = "\n\n".join([doc.page_content for doc in docs]) if has_context else ""
-
-    return {
-        "context": context,
-        "retrieved_docs": docs,
-        "has_context": has_context,
-    }
+    filters: RetrievalMetadataFilters = Field(
+        description="Metadata filters to be applied during retrieval. These filters help narrow down the search results based on specific criteria like movie title, year, or genre.",
+        default_factory=dict,
+    )
 
 
 class RAGAgent:
 
     def __init__(self):
+        self.retriever = QdrantRetriever()
         self.build_graph()
         self.chat_model = get_chat_model()
+        self.query_enrichment_model = get_query_enrichment_model()
 
     def enrich_rag_filter(self, state: RAGAgentState) -> RAGAgentState:
 
-        enrichment_chain = RAG_QUERY_ENRICHMENT_PROMPT | self.chat_model.bind_tools(
-            [retrieval_tool]
+        enrichment_chain = (
+            RAG_QUERY_ENRICHMENT_PROMPT
+            | self.query_enrichment_model.with_structured_output(RetrievalConfig)
         )
-        response = enrichment_chain.invoke({"messages": state.messages})
-        print(f"Enrichment Response : {response.tool_calls}")
-        return {"messages": [response]}
+        response: RetrievalConfig = enrichment_chain.invoke(
+            {"messages": state.messages}
+        )
+        logging.info(f"Retrieval Config : {type(response)} - {response}")
 
-    def rag_tool_node(self, state: RAGAgentState) -> RAGAgentState:
+        enriched_query = (
+            response.enriched_query
+            if response.enriched_query is not None
+            and response.enriched_query.strip() != ""
+            else state.query
+        )
 
-        tool_calls = state.messages[-1].tool_calls
-        for tool_call in tool_calls:
-            if tool_call["name"] == "context_retrieval_tool":
-                rag_tool_response = retrieval_tool.invoke(tool_call["args"])
-                tool_message = ToolMessage(
-                    content=rag_tool_response["context"], tool_call_id=tool_call["id"]
-                )
-                return {"messages": [tool_message], **rag_tool_response}
+        filters = {
+            k: v for k, v in response.filters.model_dump().items() if v is not None
+        }
+        return {"rag_filters": filters, "enriched_query": enriched_query}
+
+    def fetch_context(self, state: RAGAgentState) -> RAGAgentState:
+
+        docs = self.retriever.retrieve_docs(
+            state.enriched_query,
+            metadata_filters=state.rag_filters,
+            k=config.RETRIEVAL_K,
+        )
+        has_context = len(docs) > 0
+        context = "\n\n".join([doc.page_content for doc in docs]) if has_context else ""
+        logging.info(f"Retrieved {len(docs)} documents for context building")
 
     def should_initiate_llm(self, state: RAGAgentState) -> bool:
         if state.has_context:
@@ -106,6 +102,12 @@ class RAGAgent:
         return False
 
     def no_context_handler(self, state: RAGAgentState) -> RAGAgentState:
+        logging.info(
+            "Aborting execution as context is not available. User query - %s :: Enriched query - %s :: Metadata filters : %s",
+            state.query,
+            state.enriched_query,
+            state.rag_filters,
+        )
         response = (
             "Sorry, I couldn't find any relevant information to answer your query."
         )
@@ -113,6 +115,7 @@ class RAGAgent:
 
     def rag_chat(self, state: RAGAgentState) -> RAGAgentState:
 
+        logging.info("Initiating LLM chat pipeline")
         llm_chain = RAG_CHAT_TEMPLATE | self.chat_model
         response = llm_chain.invoke(
             {
@@ -121,21 +124,21 @@ class RAGAgent:
                 "messages": state.messages[:-1],
             }
         )
-
+        logging.info("LLM Response : %s", response.content)
         return {"messages": [response]}
 
     def build_graph(self):
 
         graph = StateGraph(RAGAgentState)
         graph.add_node("enrich_rag_filter", self.enrich_rag_filter)
-        graph.add_node("rag_tool_node", self.rag_tool_node)
+        graph.add_node("fetch_context", self.fetch_context)
         graph.add_node("rag_chat", self.rag_chat)
         graph.add_node("no_context_handler", self.no_context_handler)
 
         graph.add_edge(START, "enrich_rag_filter")
-        graph.add_edge("enrich_rag_filter", "rag_tool_node")
+        graph.add_edge("enrich_rag_filter", "fetch_context")
         graph.add_conditional_edges(
-            "rag_tool_node",
+            "fetch_context",
             self.should_initiate_llm,
             {True: "rag_chat", False: "no_context_handler"},
         )
@@ -153,6 +156,8 @@ class RAGAgent:
         state["context"] = state.get("context", "")
         state["retrieved_docs"] = state.get("retrieved_docs", [])
         state["has_context"] = state.get("has_context", False)
+        state["enriched_query"] = state.get("enriched_query", state.get("query"))
+        state["rag_filters"] = state.get("rag_filters", {})
 
         agent_state = RAGAgentState(**state)
         agent_state.messages.append(HumanMessage(content=agent_state.query))

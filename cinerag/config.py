@@ -15,3 +15,9 @@ RERANKER_MODEL = "BAAI/bge-reranker-base"
 RERANKER_THRESHOLD = 0.4
 
 RETRIEVAL_K = 10
+
+CHAT_MODEL_ID="amazon.nova-lite-v1:0"
+QUERY_ENRICHMENT_MODEL_ID="gemini-2.0-flash"
+# "mistral.mistral-7b-instruct-v0:2"
+# "anthropic.claude-3-haiku-20240307-v1:0"
+# "amazon.nova-lite-v1:0"
