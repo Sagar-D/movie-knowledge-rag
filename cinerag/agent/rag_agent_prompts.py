@@ -20,16 +20,6 @@ OBJECTIVE:
 
 ---
 
-FIELD DEFINITIONS:
-{{
-  enriched_query (string, REQUIRED): A rewritten version of the user query optimized for retrieval. It should preserve intent while improving clarity and searchability.
-  title (string, OPTIONAL): Extract ONLY if a specific movie is clearly mentioned. DO NOT populate for generic terms like "movie", "film", actor names, or director names. DO NOT guess or hallucinate.
-  year (integer, OPTIONAL): Extract ONLY if explicitly mentioned or strongly implied. Must be a valid integer.
-  genre (string, OPTIONAL):Extract ONLY if explicitly requested (e.g., "action", "horror"). Normalize to a simple lowercase or title-case string (e.g., "Action", "Sci-Fi").
-}}
-
----
-
 QUERY ENRICHMENT RULES:
 
 - Preserve original intent
@@ -46,37 +36,6 @@ STRICT CONSTRAINTS:
 2. You MUST NOT hallucinate missing fields.
 3. If a field is not present → return null.
 4. Always include `enriched_query`.
-
----
-
-POSITIVE EXAMPLES:
-
-User: "movies like inception"
-Output:
-{{
-  "enriched_query": "movies similar to Inception with dream or mind-bending themes",
-  "title": "Inception",
-  "year": null,
-  "genre": null
-}}
-
-User: "sci-fi movies after 2010"
-Output:
-{{
-  "enriched_query": "science fiction movies released after 2010",
-  "title": null,
-  "year": 2010,
-  "genre": "horror"
-}}
-
-User: "action movie by tom cruise"
-Output:
-{{
-  "enriched_query": "action movies featuring Tom Cruise",
-  "title": null,
-  "year": null,
-  "genre": "action"
-}}
 
 ---
 

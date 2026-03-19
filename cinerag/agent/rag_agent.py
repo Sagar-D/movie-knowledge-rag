@@ -27,10 +27,6 @@ class RAGAgentState(BaseModel):
 
 
 class RetrievalMetadataFilters(BaseModel):
-    title: Optional[str] = Field(
-        None,
-        description="If the query is related to a specific movie, extract the movie title and provide it here. Otherwise, leave it empty.",
-    )
     year: Optional[int] = Field(
         None,
         description="If the query is related to a specific movie, extract the movie release year and provide it here. Otherwise, leave it empty.",
@@ -98,6 +94,7 @@ class RAGAgent:
         has_context = len(docs) > 0
         context = "\n\n".join([doc.page_content for doc in docs]) if has_context else ""
         logging.info(f"Retrieved {len(docs)} documents for context building")
+        return {"retrieved_docs": docs, "context": context, "has_context": has_context}
 
     def should_initiate_llm(self, state: RAGAgentState) -> bool:
         if state.has_context:
