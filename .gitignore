@@ -1,5 +1,33 @@
+# Python
 .venv/
 __pycache__/
-test.py
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Env & secrets
 .env
+*.env.local
+
+# Logs
 logs/
+*.log
+
+# Dev/test
+test.py
+
+# Next.js
+cinerag-ui/.next/
+cinerag-ui/out/
+cinerag-ui/node_modules/
+cinerag-ui/.env.local
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
