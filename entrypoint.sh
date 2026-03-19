@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e
 
-echo "Running build_index..."
-python -m cinerag.pipelines.build_index
-
 echo "Loading BM25 documents..."
 python -c "from cinerag.retrieval.bm25_retriever import build_bm25_index; build_bm25_index()"
 
