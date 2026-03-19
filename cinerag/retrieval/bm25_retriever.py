@@ -10,7 +10,7 @@ is_bm25_index_built = False
 bm25_documents = []
 
 
-def build_bm25_idnde():
+def build_bm25_index():
     global is_bm25_index_built
     global bm25_documents
 

@@ -1,3 +1,5 @@
+import os
+
 DEFAULT_S3_BUCKET = "cinerag-data"
 S3_RAW_DATA_FOLDER = "raw/"
 S3_PROCESSED_DATA_FOLDER = "processed/"
@@ -8,8 +10,8 @@ EMBEDDING_BATCH_SIZE = 128
 EMBEDDING_DIMENSION = 768
 VECTOR_COLLECTION_NAME = "cinerag_stage"
 
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
+QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 
 RERANKER_MODEL = "BAAI/bge-reranker-base"
 RERANKER_THRESHOLD = 0.4
