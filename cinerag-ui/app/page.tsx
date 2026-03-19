@@ -71,11 +71,11 @@ export default function Home() {
   }
 
   const mdComponents = {
-    p: ({ children }: { children: React.ReactNode }) => <p className="mb-2 last:mb-0">{children}</p>,
-    strong: ({ children }: { children: React.ReactNode }) => <strong className="font-semibold" style={{ color: "var(--gold)" }}>{children}</strong>,
-    ol: ({ children }: { children: React.ReactNode }) => <ol className="list-decimal list-inside space-y-2">{children}</ol>,
-    ul: ({ children }: { children: React.ReactNode }) => <ul className="list-disc list-inside space-y-1">{children}</ul>,
-    li: ({ children }: { children: React.ReactNode }) => <li className="leading-relaxed">{children}</li>,
+    p: ({ children }: { children?: React.ReactNode }) => <p className="mb-2 last:mb-0">{children}</p>,
+    strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold" style={{ color: "var(--gold)" }}>{children}</strong>,
+    ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal list-inside space-y-2">{children}</ol>,
+    ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc list-inside space-y-1">{children}</ul>,
+    li: ({ children }: { children?: React.ReactNode }) => <li className="leading-relaxed">{children}</li>,
   };
 
   return (
