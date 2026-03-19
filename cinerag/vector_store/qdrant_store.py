@@ -5,18 +5,13 @@ from cinerag import config
 from cinerag.documents.helper import generate_movie_doc_id
 
 
-from qdrant_client import AsyncQdrantClient
-from qdrant_client.models import PointStruct, Distance
-from typing import List, Dict
-from cinerag import config
-
-
-
 class VectorStore:
 
     def __init__(self):
         self.client = AsyncQdrantClient(
-            host=config.QDRANT_HOST, port=config.QDRANT_PORT
+            host=config.QDRANT_HOST,
+            port=config.QDRANT_PORT,
+            timeout=60,
         )
 
     async def initialize(self):
