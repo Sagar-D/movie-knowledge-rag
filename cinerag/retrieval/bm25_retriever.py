@@ -23,7 +23,7 @@ def build_bm25_idnde():
         record = json.loads(line.decode("utf-8"))
         bm25_documents.append(
             Document(
-                page_content=record["text"],
+                page_content=(str(record["text"]).lower().strip()),
                 metadata={
                     "id": generate_movie_doc_id(
                         record["metadata"]["title"],
@@ -56,4 +56,5 @@ class BM25Retriever:
     def retrieve_docs(self, query: str, k: int = 5):
 
         self.retriever.k = k
+        query = query.strip().lower()
         return self.retriever.invoke(query)

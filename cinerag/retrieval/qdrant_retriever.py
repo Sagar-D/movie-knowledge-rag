@@ -28,6 +28,12 @@ class QdrantRetriever:
         return self.vector_store.similarity_search(query, k=k)
 
     def _generate_metadata_filter(self, filters: Dict) -> Filter:
+
+        if filters.get("title", None) is not None:
+            filters["title"] = str(filters["title"]).lower().strip()
+        if filters.get("genre", None) is not None:
+            filters["genre"] = str(filters["genre"]).lower().strip()
+
         return Filter(
             must=[
                 FieldCondition(key=f"metadata.{key}", match=MatchValue(value=value))

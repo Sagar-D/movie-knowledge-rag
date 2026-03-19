@@ -37,6 +37,9 @@ async def build_rag_index():
     await vector_store.initialize()
     async for docs, embeddings in stream_document_embeddings():
         docs = [{"page_content": record["text"], "metadata":record["metadata"]} for record in docs]
+        for doc in docs :
+            doc["metadata"]["genre"] = str(doc["metadata"]["genre"]).lower().strip()
+            doc["metadata"]["title"] = str(doc["metadata"]["title"]).lower().strip()
         await vector_store.store_embeddings(docs=docs, embeddings=embeddings)
         logging.info(f"Indexed batch of {len(docs)} documents and embeddings in Qdrant")
         logging.info(f"Vector collection count: {await vector_store.client.count(config.VECTOR_COLLECTION_NAME)}")
