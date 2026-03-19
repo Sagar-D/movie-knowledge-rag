@@ -162,3 +162,34 @@ class RAGAgent:
         agent_state = RAGAgentState(**state)
         agent_state.messages.append(HumanMessage(content=agent_state.query))
         return self.agent.invoke(agent_state)
+
+    def stream(self, state: Dict):
+
+        if str(state.get("query", "")).strip() == "":
+            raise ValueError("Required field 'query' missing in the state")
+
+        state["messages"] = state.get("messages", [])
+        state["context"] = state.get("context", "")
+        state["retrieved_docs"] = state.get("retrieved_docs", [])
+        state["has_context"] = state.get("has_context", False)
+        state["enriched_query"] = state.get("enriched_query", state.get("query"))
+        state["rag_filters"] = state.get("rag_filters", {})
+
+        agent_state = RAGAgentState(**state)
+        agent_state.messages.append(HumanMessage(content=agent_state.query))
+
+        for msg, metadata in self.agent.stream(agent_state, stream_mode="messages"):
+            if (
+                metadata.get("langgraph_node") in ("rag_chat", "no_context_handler")
+                and hasattr(msg, "content")
+                and msg.content
+            ):
+                content = msg.content
+                if isinstance(content, list):
+                    for block in content:
+                        if isinstance(block, str):
+                            yield block
+                        elif isinstance(block, dict) and "text" in block:
+                            yield block["text"]
+                elif isinstance(content, str):
+                    yield content

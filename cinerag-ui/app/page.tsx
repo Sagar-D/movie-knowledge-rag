@@ -2,19 +2,20 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Film, Loader2 } from "lucide-react";
-import { Message, ChatResponse } from "./types";
+import { Message } from "./types";
 import ReactMarkdown from "react-markdown";
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
   const [enrichedQuery, setEnrichedQuery] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  }, [messages, streamingContent, loading]);
 
   const canSend = input.trim().length > 0 && !loading;
 
@@ -23,27 +24,59 @@ export default function Home() {
     if (!canSend) return;
 
     const userMessage: Message = { role: "human", content: query };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    const history = [...messages];
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
     setLoading(true);
+    setStreamingContent("");
     setEnrichedQuery(null);
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, history: messages }),
+        body: JSON.stringify({ query, history }),
       });
-      const data: ChatResponse = await res.json();
-      setMessages([...updatedMessages, { role: "ai", content: data.answer }]);
-      if (data.enriched_query) setEnrichedQuery(data.enriched_query);
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const lines = decoder.decode(value).split("\n");
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.token) {
+              fullContent += parsed.token;
+              setStreamingContent(fullContent);
+            }
+          } catch {}
+        }
+      }
+
+      setMessages((prev) => [...prev, { role: "ai", content: fullContent }]);
+      setStreamingContent("");
     } catch {
-      setMessages([...updatedMessages, { role: "ai", content: "Something went wrong. Please try again." }]);
+      setMessages((prev) => [...prev, { role: "ai", content: "Something went wrong. Please try again." }]);
     } finally {
       setLoading(false);
     }
   }
+
+  const mdComponents = {
+    p: ({ children }: { children: React.ReactNode }) => <p className="mb-2 last:mb-0">{children}</p>,
+    strong: ({ children }: { children: React.ReactNode }) => <strong className="font-semibold" style={{ color: "var(--gold)" }}>{children}</strong>,
+    ol: ({ children }: { children: React.ReactNode }) => <ol className="list-decimal list-inside space-y-2">{children}</ol>,
+    ul: ({ children }: { children: React.ReactNode }) => <ul className="list-disc list-inside space-y-1">{children}</ul>,
+    li: ({ children }: { children: React.ReactNode }) => <li className="leading-relaxed">{children}</li>,
+  };
 
   return (
     <div className="flex flex-col h-screen" style={{ backgroundColor: "var(--bg-primary)" }}>
@@ -59,7 +92,7 @@ export default function Home() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto scrollbar-thin px-4 py-6 space-y-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && !streamingContent && (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
             <Film size={40} style={{ color: "var(--gold-muted)" }} />
             <p className="text-base font-medium" style={{ color: "var(--text-primary)" }}>Ask me anything about movies</p>
@@ -78,17 +111,7 @@ export default function Home() {
               }
             >
               {msg.role === "ai" ? (
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                    strong: ({ children }) => <strong className="font-semibold" style={{ color: "var(--gold)" }}>{children}</strong>,
-                    ol: ({ children }) => <ol className="list-decimal list-inside space-y-2">{children}</ol>,
-                    ul: ({ children }) => <ul className="list-disc list-inside space-y-1">{children}</ul>,
-                    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                  }}
-                >
-                  {msg.content}
-                </ReactMarkdown>
+                <ReactMarkdown components={mdComponents}>{msg.content}</ReactMarkdown>
               ) : (
                 msg.content
               )}
@@ -96,7 +119,18 @@ export default function Home() {
           </div>
         ))}
 
-        {loading && (
+        {/* Streaming bubble */}
+        {streamingContent && (
+          <div className="flex justify-start">
+            <div className="max-w-[70%] px-4 py-3 rounded-xl text-sm leading-relaxed" style={{ backgroundColor: "var(--bg-card)", color: "var(--text-primary)", border: "1px solid var(--border)" }}>
+              <ReactMarkdown components={mdComponents}>{streamingContent}</ReactMarkdown>
+              <span className="inline-block w-1.5 h-3.5 ml-0.5 align-middle animate-pulse rounded-sm" style={{ backgroundColor: "var(--gold)" }} />
+            </div>
+          </div>
+        )}
+
+        {/* Thinking indicator — shown before first token arrives */}
+        {loading && !streamingContent && (
           <div className="flex justify-start">
             <div className="px-4 py-3 rounded-xl text-sm flex items-center gap-2" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
               <Loader2 size={14} className="animate-spin" />
