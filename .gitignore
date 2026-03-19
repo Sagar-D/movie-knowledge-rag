@@ -31,3 +31,5 @@ cinerag-ui/.env.local
 # IDE
 .vscode/
 .idea/
+
+secrets/
